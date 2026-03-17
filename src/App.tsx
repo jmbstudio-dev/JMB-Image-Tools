@@ -1,7 +1,11 @@
 import { Home } from "./sections/Home";
 
 function App() {
-  return <Home />;
+  return (
+    <main>
+      <Home />
+    </main>
+  );
 }
 
 export default App;
