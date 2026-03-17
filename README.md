@@ -1,73 +1,66 @@
-# React + TypeScript + Vite
+# 🖼️ Image Converter
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A fast, private, client-side image converter built with React + Vite. No login, no uploads, no server — everything runs directly in your browser.
 
-Currently, two official plugins are available:
+> Got tired of looking for a good one on the internet, so I made a simple one. 👍
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ✨ Features
 
-## React Compiler
+- 🔄 Convert images to **WebP, JPEG, PNG, BMP, AVIF**
+- 🎚️ **Quality control** slider for lossy formats (WebP, JPEG, AVIF)
+- 📦 Batch convert up to **20 files** at once — downloaded as a `.zip`
+- 📊 **File size comparison** — see original vs converted size per image
+- 🖱️ **Drag & drop** or click to upload
+- ⚡ **Parallel conversion** — all files convert simultaneously
+- 🔒 **100% private** — your images never leave your device
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🛡️ Privacy
 
-## Expanding the ESLint configuration
+This tool is entirely client-side. No data is sent to any server. No analytics on your images. No storage. The conversion happens on your own device using the browser's built-in Canvas API.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## ⚠️ Known Limitations
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- **AVIF** is supported on Chrome/Edge but may fail on Firefox or Safari — use WebP for broader compatibility
+- Very large images (16,000×16,000px+) may fail silently due to browser canvas memory limits
+- HEIC/HEIF (iPhone photos) are not currently supported as input
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 🚀 Getting Started
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Prerequisites
+
+- Node.js 18+
+- npm
+
+### Installation
+```bash
+git clone https://github.com/your-username/img-converter-v.git
+cd img-converter-v
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Development
+```bash
+npm run dev
 ```
+
+### Build
+```bash
+npm run build
+```
+
+### Preview production build
+```bash
+npm run preview
+```
+
+## 🧰 Tech Stack
+
+| Tool | Purpose |
+|---|---|
+| React 19 | UI framework |
+| TypeScript | Type safety |
+| Vite | Build tool |
+| Tailwind CSS v4 | Styling |
+| Canvas API | Image conversion (no external deps) |
+| JSZip | Bundling converted files into `.zip` |
+| file-saver | Triggering browser download |
