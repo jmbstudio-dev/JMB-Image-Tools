@@ -10,7 +10,6 @@ const socialLinks = [
   { icon: Github, href: "https://github.com/jmbstudio-dev", label: "GitHub" },
 ];
 export const Home = () => {
-  const currentYear = new Date().getFullYear();
   return (
     <section
       id="home"
