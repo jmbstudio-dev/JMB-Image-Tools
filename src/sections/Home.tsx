@@ -1,14 +1,5 @@
 import { Converter } from "../components/Converter";
-import { Github, Linkedin } from "lucide-react";
 
-const socialLinks = [
-  {
-    icon: Linkedin,
-    href: "https://www.linkedin.com/in/johnmelvin-burgos",
-    label: "LinkedIn",
-  },
-  { icon: Github, href: "https://github.com/jmbstudio-dev", label: "GitHub" },
-];
 export const Home = () => {
   return (
     <section
@@ -20,40 +11,13 @@ export const Home = () => {
           <Converter />
         </div>
 
-        <div className="pt-12">
-          <nav className="container mx-auto px-6">
-            <div className="flex flex-col md:flex-row items-center justify-center gap-8">
-              {/* Logo & Copyright */}
-
-              <div>
-                <p className="text-sm text-muted-foreground m-auto">
-                  Thankyou for checking this out ! I am...
-                </p>
-              </div>
-
-              {/* Social Links */}
-              <div className="flex items-center gap-4">
-                <a
-                  href="https://jmbstudio.dev/"
-                  className="text-xl font-bold tracking-tighter"
-                >
-                  JM<span className="text-primary">B</span>
-                </a>
-
-                {socialLinks.map((social) => (
-                  <a
-                    key={social.label}
-                    href={social.href}
-                    aria-label={social.label}
-                    target="_blank"
-                  >
-                    <social.icon className="w-5 h-5" />
-                  </a>
-                ))}
-              </div>
-            </div>
-          </nav>
+        <div className="pt-12 container flex justify-center mx-auto px-6">
+        <div>
+          <p className="text-sm text-muted-foreground m-auto">
+            Thankyou for checking this out!
+          </p>
         </div>
+      </div>
       </div>
     </section>
   );
