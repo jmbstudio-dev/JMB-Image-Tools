@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { saveAs } from "file-saver";
 
 const RATIOS = [
@@ -10,12 +10,58 @@ const RATIOS = [
   { label: "9:16", value: 9 / 16 },
 ];
 
+const HANDLE_SIZE = 8;
+
 interface CropBox {
   x: number;
   y: number;
   w: number;
   h: number;
 }
+
+type Handle =
+  | "nw" | "n" | "ne"
+  | "w"  |       "e"
+  | "sw" | "s" | "se"
+  | "move" | null;
+
+const getCursor = (handle: Handle): string => {
+  switch (handle) {
+    case "nw": case "se": return "nwse-resize";
+    case "ne": case "sw": return "nesw-resize";
+    case "n":  case "s":  return "ns-resize";
+    case "w":  case "e":  return "ew-resize";
+    case "move": return "move";
+    default: return "crosshair";
+  }
+};
+
+const getHandle = (box: CropBox, x: number, y: number): Handle => {
+  const hs = HANDLE_SIZE;
+  const cx = box.x + box.w / 2;
+  const cy = box.y + box.h / 2;
+
+  const handles: { name: Handle; hx: number; hy: number }[] = [
+    { name: "nw", hx: box.x,      hy: box.y },
+    { name: "n",  hx: cx,          hy: box.y },
+    { name: "ne", hx: box.x + box.w, hy: box.y },
+    { name: "w",  hx: box.x,       hy: cy },
+    { name: "e",  hx: box.x + box.w, hy: cy },
+    { name: "sw", hx: box.x,       hy: box.y + box.h },
+    { name: "s",  hx: cx,           hy: box.y + box.h },
+    { name: "se", hx: box.x + box.w, hy: box.y + box.h },
+  ];
+
+  for (const h of handles) {
+    if (Math.abs(x - h.hx) <= hs && Math.abs(y - h.hy) <= hs) return h.name;
+  }
+
+  if (x > box.x && x < box.x + box.w && y > box.y && y < box.y + box.h) {
+    return "move";
+  }
+
+  return null;
+};
 
 export const CropperTab = () => {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -27,10 +73,13 @@ export const CropperTab = () => {
   const [file, setFile] = useState<File | null>(null);
   const [ratio, setRatio] = useState<number | null>(null);
   const [cropBox, setCropBox] = useState<CropBox>({ x: 0, y: 0, w: 200, h: 200 });
-  const [dragging, setDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0, bx: 0, by: 0 });
   const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 });
   const [displaySize, setDisplaySize] = useState({ w: 0, h: 0 });
+
+  const activeHandle = useRef<Handle>(null);
+  const dragStart = useRef({ mx: 0, my: 0, box: { x: 0, y: 0, w: 0, h: 0 } });
+  const currentBox = useRef<CropBox>({ x: 0, y: 0, w: 200, h: 200 });
+  const currentRatio = useRef<number | null>(null);
 
   const drawOverlay = useCallback((box: CropBox) => {
     const canvas = canvasRef.current;
@@ -42,11 +91,9 @@ export const CropperTab = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // dark overlay
     ctx.fillStyle = "rgba(0,0,0,0.5)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // clear crop area
     ctx.clearRect(box.x, box.y, box.w, box.h);
     ctx.drawImage(
       img,
@@ -54,10 +101,7 @@ export const CropperTab = () => {
       (box.y / canvas.height) * naturalSize.h,
       (box.w / canvas.width) * naturalSize.w,
       (box.h / canvas.height) * naturalSize.h,
-      box.x,
-      box.y,
-      box.w,
-      box.h,
+      box.x, box.y, box.w, box.h,
     );
 
     // border
@@ -79,6 +123,30 @@ export const CropperTab = () => {
       ctx.stroke();
     }
 
+    // handles
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    const handlePoints = [
+      { x: box.x,        y: box.y },
+      { x: cx,           y: box.y },
+      { x: box.x + box.w, y: box.y },
+      { x: box.x,        y: cy },
+      { x: box.x + box.w, y: cy },
+      { x: box.x,        y: box.y + box.h },
+      { x: cx,           y: box.y + box.h },
+      { x: box.x + box.w, y: box.y + box.h },
+    ];
+
+    handlePoints.forEach(({ x, y }) => {
+      ctx.fillStyle = "white";
+      ctx.strokeStyle = "var(--color-primary)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.rect(x - HANDLE_SIZE / 2, y - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
+      ctx.fill();
+      ctx.stroke();
+    });
+
     updatePreview(box);
   }, [naturalSize]);
 
@@ -93,19 +161,14 @@ export const CropperTab = () => {
     const scaleX = naturalSize.w / canvas.width;
     const scaleY = naturalSize.h / canvas.height;
 
-    preview.width = box.w * scaleX;
-    preview.height = box.h * scaleY;
+    preview.width = Math.max(1, box.w * scaleX);
+    preview.height = Math.max(1, box.h * scaleY);
 
     ctx.drawImage(
       img,
-      box.x * scaleX,
-      box.y * scaleY,
-      box.w * scaleX,
-      box.h * scaleY,
-      0,
-      0,
-      preview.width,
-      preview.height,
+      box.x * scaleX, box.y * scaleY,
+      box.w * scaleX, box.h * scaleY,
+      0, 0, preview.width, preview.height,
     );
   };
 
@@ -131,11 +194,15 @@ export const CropperTab = () => {
       canvas.width = dw;
       canvas.height = dh;
 
-      const initialBox: CropBox = { x: dw * 0.1, y: dh * 0.1, w: dw * 0.8, h: dh * 0.8 };
-      setCropBox(initialBox);
+      const initialBox: CropBox = {
+        x: Math.round(dw * 0.1),
+        y: Math.round(dh * 0.1),
+        w: Math.round(dw * 0.8),
+        h: Math.round(dh * 0.8),
+      };
 
-      const ctx = canvas.getContext("2d");
-      if (ctx) ctx.drawImage(img, 0, 0, dw, dh);
+      currentBox.current = initialBox;
+      setCropBox(initialBox);
 
       setTimeout(() => drawOverlay(initialBox), 50);
       URL.revokeObjectURL(url);
@@ -155,47 +222,96 @@ export const CropperTab = () => {
 
   const getCanvasPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const scaleX = canvasRef.current!.width / rect.width;
+    const scaleY = canvasRef.current!.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasPos(e);
-    setDragging(true);
-    setDragStart({ x, y, bx: cropBox.x, by: cropBox.y });
+    const handle = getHandle(currentBox.current, x, y);
+    activeHandle.current = handle;
+    dragStart.current = { mx: x, my: y, box: { ...currentBox.current } };
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!dragging) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     const { x, y } = getCanvasPos(e);
-    const dx = x - dragStart.x;
-    const dy = y - dragStart.y;
-    const canvas = canvasRef.current!;
+    const handle = activeHandle.current;
+    const start = dragStart.current;
+    const r = currentRatio.current;
 
-    let newX = Math.max(0, Math.min(dragStart.bx + dx, canvas.width - cropBox.w));
-    let newY = Math.max(0, Math.min(dragStart.by + dy, canvas.height - cropBox.h));
+    // update cursor
+    if (!handle) {
+      canvas.style.cursor = getCursor(getHandle(currentBox.current, x, y));
+      return;
+    }
 
-    const newBox = { ...cropBox, x: newX, y: newY };
-    setCropBox(newBox);
-    drawOverlay(newBox);
+    canvas.style.cursor = getCursor(handle);
+
+    const dx = x - start.mx;
+    const dy = y - start.my;
+    const b = { ...start.box };
+    const minSize = 20;
+
+    if (handle === "move") {
+      b.x = Math.max(0, Math.min(b.x + dx, canvas.width - b.w));
+      b.y = Math.max(0, Math.min(b.y + dy, canvas.height - b.h));
+    } else {
+      if (handle.includes("e")) b.w = Math.max(minSize, Math.min(b.w + dx, canvas.width - b.x));
+      if (handle.includes("s")) b.h = Math.max(minSize, Math.min(b.h + dy, canvas.height - b.y));
+      if (handle.includes("w")) {
+        const newW = Math.max(minSize, b.w - dx);
+        b.x = b.x + b.w - newW;
+        b.w = newW;
+      }
+      if (handle.includes("n")) {
+        const newH = Math.max(minSize, b.h - dy);
+        b.y = b.y + b.h - newH;
+        b.h = newH;
+      }
+
+      // enforce ratio if set
+      if (r !== null) {
+        if (handle.includes("e") || handle.includes("w")) {
+          b.h = Math.round(b.w / r);
+        } else {
+          b.w = Math.round(b.h * r);
+        }
+        b.h = Math.min(b.h, canvas.height - b.y);
+        b.w = Math.min(b.w, canvas.width - b.x);
+      }
+    }
+
+    currentBox.current = b;
+    setCropBox(b);
+    drawOverlay(b);
   };
 
-  const handleMouseUp = () => setDragging(false);
+  const handleMouseUp = () => {
+    activeHandle.current = null;
+  };
 
   const applyRatio = (r: number | null) => {
     setRatio(r);
+    currentRatio.current = r;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    let newBox = { ...cropBox };
+    const b = { ...currentBox.current };
     if (r !== null) {
-      newBox.h = Math.round(newBox.w / r);
-      if (newBox.y + newBox.h > canvas.height) {
-        newBox.h = canvas.height - newBox.y;
-        newBox.w = Math.round(newBox.h * r);
+      b.h = Math.round(b.w / r);
+      if (b.y + b.h > canvas.height) {
+        b.h = canvas.height - b.y;
+        b.w = Math.round(b.h * r);
       }
     }
-    setCropBox(newBox);
-    drawOverlay(newBox);
+    currentBox.current = b;
+    setCropBox(b);
+    drawOverlay(b);
   };
 
   const handleCrop = () => {
@@ -205,23 +321,19 @@ export const CropperTab = () => {
 
     const scaleX = naturalSize.w / canvas.width;
     const scaleY = naturalSize.h / canvas.height;
+    const box = currentBox.current;
 
     const out = document.createElement("canvas");
-    out.width = Math.round(cropBox.w * scaleX);
-    out.height = Math.round(cropBox.h * scaleY);
+    out.width = Math.round(box.w * scaleX);
+    out.height = Math.round(box.h * scaleY);
     const ctx = out.getContext("2d");
     if (!ctx) return;
 
     ctx.drawImage(
       img,
-      cropBox.x * scaleX,
-      cropBox.y * scaleY,
-      out.width,
-      out.height,
-      0,
-      0,
-      out.width,
-      out.height,
+      box.x * scaleX, box.y * scaleY,
+      out.width, out.height,
+      0, 0, out.width, out.height,
     );
 
     out.toBlob((blob) => {
@@ -230,6 +342,11 @@ export const CropperTab = () => {
       saveAs(blob, file.name.replace(/\.[^/.]+$/, "") + `_cropped.${ext}`);
     }, file.type);
   };
+
+  // redraw when naturalSize updates
+  useEffect(() => {
+    if (naturalSize.w > 0) drawOverlay(currentBox.current);
+  }, [naturalSize, drawOverlay]);
 
   return (
     <div className="space-y-6">
@@ -255,12 +372,13 @@ export const CropperTab = () => {
         </div>
       )}
 
-      {/* CHANGE IMAGE BUTTON */}
+      {/* CHANGE IMAGE */}
       {file && (
         <button
           onClick={() => {
             setFile(null);
             setCropBox({ x: 0, y: 0, w: 200, h: 200 });
+            currentBox.current = { x: 0, y: 0, w: 200, h: 200 };
           }}
           className="text-xs text-muted-foreground hover:text-primary transition-colors"
         >
@@ -298,7 +416,7 @@ export const CropperTab = () => {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            className="w-full rounded-lg cursor-move"
+            className="w-full rounded-lg"
           />
         )}
       </div>
@@ -311,7 +429,7 @@ export const CropperTab = () => {
           </p>
           <canvas
             ref={previewRef}
-            className="max-w-full rounded-lg border border-border/50 max-h-40 object-contain"
+            className="max-w-full rounded-lg border border-border/50 max-h-40"
           />
           <p className="text-xs text-muted-foreground">
             Crop size: {Math.round(cropBox.w)} × {Math.round(cropBox.h)}px
