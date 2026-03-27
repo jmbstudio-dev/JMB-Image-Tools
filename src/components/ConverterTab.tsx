@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
-// import { formatBytes } from "../utils/formatBytes";
 import { PreviewGrid } from "./PreviewGrid";
 
 const FORMATS = [

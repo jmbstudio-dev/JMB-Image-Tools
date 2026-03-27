@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
 import imageCompression from "browser-image-compression";
-// import { formatBytes } from "../utils/formatBytes";
 import { PreviewGrid } from "./PreviewGrid";
 
 export const CompressorTab = () => {
