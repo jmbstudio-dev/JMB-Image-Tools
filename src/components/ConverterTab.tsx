@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
-import { Download } from "lucide-react";
-import { formatBytes } from "../utils/formatBytes";
+// import { formatBytes } from "../utils/formatBytes";
+import { PreviewGrid } from "./PreviewGrid";
 
 const FORMATS = [
   { label: "WebP", value: "image/webp", ext: "webp", hasQuality: true },
@@ -56,30 +56,32 @@ export const ConverterTab = () => {
   const [errors, setErrors] = useState<string[]>([]);
   const [outputSizes, setOutputSizes] = useState<number[]>([]);
   const [outputBlobs, setOutputBlobs] = useState<(Blob | null)[]>([]);
+  const [selected, setSelected] = useState<boolean[]>([]);
   const [zipMode, setZipMode] = useState(false);
 
   const selectedFormat = FORMATS.find((f) => f.value === format)!;
 
+  const initFiles = (arr: File[]) => {
+    setFiles(arr);
+    setProgress(Array(arr.length).fill(0));
+    setErrors(Array(arr.length).fill(""));
+    setOutputSizes(Array(arr.length).fill(0));
+    setOutputBlobs(Array(arr.length).fill(null));
+    setSelected(Array(arr.length).fill(false));
+  };
+
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const selected = Array.from(e.target.files).slice(0, 20);
-    setFiles(selected);
-    setProgress(Array(selected.length).fill(0));
-    setErrors(Array(selected.length).fill(""));
-    setOutputSizes(Array(selected.length).fill(0));
-    setOutputBlobs(Array(selected.length).fill(null));
+    initFiles(Array.from(e.target.files).slice(0, 20));
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const dropped = Array.from(e.dataTransfer.files)
-      .filter((f) => f.type.startsWith("image/"))
-      .slice(0, 20);
-    setFiles(dropped);
-    setProgress(Array(dropped.length).fill(0));
-    setErrors(Array(dropped.length).fill(""));
-    setOutputSizes(Array(dropped.length).fill(0));
-    setOutputBlobs(Array(dropped.length).fill(null));
+    initFiles(
+      Array.from(e.dataTransfer.files)
+        .filter((f) => f.type.startsWith("image/"))
+        .slice(0, 20),
+    );
   };
 
   const convertImages = async () => {
@@ -87,6 +89,7 @@ export const ConverterTab = () => {
     setProgress(Array(files.length).fill(0));
     setErrors(Array(files.length).fill(""));
     setOutputSizes(Array(files.length).fill(0));
+    setSelected(Array(files.length).fill(false));
 
     const blobs: (Blob | null)[] = Array(files.length).fill(null);
     const zip = new JSZip();
@@ -102,12 +105,8 @@ export const ConverterTab = () => {
           setProgress((prev) => { const c = [...prev]; c[i] = 90; return c; });
 
           const newName = file.name.replace(/\.[^/.]+$/, "") + "." + selectedFormat.ext;
-
-          if (zipMode) {
-            zip.file(newName, await blob.arrayBuffer());
-          } else {
-            saveAs(blob, newName);
-          }
+          if (zipMode) zip.file(newName, await blob.arrayBuffer());
+          else saveAs(blob, newName);
 
           setProgress((prev) => { const c = [...prev]; c[i] = 100; return c; });
         } catch {
@@ -118,20 +117,38 @@ export const ConverterTab = () => {
     );
 
     setOutputBlobs(blobs);
-
     if (zipMode) {
       const zipBlob = await zip.generateAsync({ type: "blob" });
       saveAs(zipBlob, "converted-images.zip");
     }
-
     setConverting(false);
   };
 
   const downloadSingle = (idx: number) => {
     const blob = outputBlobs[idx];
     if (!blob) return;
-    const newName = files[idx].name.replace(/\.[^/.]+$/, "") + "." + selectedFormat.ext;
-    saveAs(blob, newName);
+    saveAs(blob, files[idx].name.replace(/\.[^/.]+$/, "") + "." + selectedFormat.ext);
+  };
+
+  const handleToggle = (idx: number) => {
+    setSelected((prev) => { const c = [...prev]; c[idx] = !c[idx]; return c; });
+  };
+
+  const handleSelectAll = () => {
+    const allSelected = selected.every(Boolean);
+    setSelected(outputBlobs.map((b) => (!allSelected && !!b)));
+  };
+
+  const handleDownloadSelected = async () => {
+    const zip = new JSZip();
+    files.forEach((file, i) => {
+      if (selected[i] && outputBlobs[i]) {
+        const name = file.name.replace(/\.[^/.]+$/, "") + "." + selectedFormat.ext;
+        zip.file(name, outputBlobs[i]!);
+      }
+    });
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    saveAs(zipBlob, "selected-converted.zip");
   };
 
   return (
@@ -144,17 +161,8 @@ export const ConverterTab = () => {
         onDragOver={(e) => e.preventDefault()}
         onClick={() => inputRef.current?.click()}
       >
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept="image/*"
-          onChange={handleFiles}
-          className="hidden"
-        />
-        <p className="text-sm text-muted-foreground">
-          Drag & drop images here or click to upload
-        </p>
+        <input ref={inputRef} type="file" multiple accept="image/*" onChange={handleFiles} className="hidden" />
+        <p className="text-sm text-muted-foreground">Drag & drop images here or click to upload</p>
       </div>
 
       {/* FORMAT */}
@@ -178,15 +186,7 @@ export const ConverterTab = () => {
             <label className="text-sm text-muted-foreground">Quality:</label>
             <span className="text-sm text-primary font-medium">{quality}%</span>
           </div>
-          <input
-            type="range"
-            min={10}
-            max={100}
-            step={5}
-            value={quality}
-            onChange={(e) => setQuality(Number(e.target.value))}
-            className="w-full accent-primary"
-          />
+          <input type="range" min={10} max={100} step={5} value={quality} onChange={(e) => setQuality(Number(e.target.value))} className="w-full accent-primary" />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Smaller file</span>
             <span>Best quality</span>
@@ -196,71 +196,29 @@ export const ConverterTab = () => {
 
       {/* ZIP TOGGLE */}
       <label className="flex items-center gap-3 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={zipMode}
-          onChange={(e) => setZipMode(e.target.checked)}
-          className="accent-primary w-4 h-4"
-        />
-        <span className="text-sm text-muted-foreground">
-          Download as <span className="text-foreground">.zip</span>
-        </span>
+        <input type="checkbox" checked={zipMode} onChange={(e) => setZipMode(e.target.checked)} className="accent-primary w-4 h-4" />
+        <span className="text-sm text-muted-foreground">Download as <span className="text-foreground">.zip</span></span>
       </label>
 
       {/* BUTTON */}
-      <button
-        onClick={convertImages}
-        disabled={files.length === 0 || converting}
-        className="w-full py-2 rounded-md bg-primary text-background hover:opacity-90 disabled:opacity-50 transition"
-      >
+      <button onClick={convertImages} disabled={files.length === 0 || converting} className="w-full py-2 rounded-md bg-primary text-background hover:opacity-90 disabled:opacity-50 transition">
         {converting ? "Converting..." : "Convert Images"}
       </button>
 
-      <p className="text-sm text-center text-muted-foreground">
-        {files.length} file(s) selected
-      </p>
+      <p className="text-sm text-center text-muted-foreground">{files.length} file(s) selected</p>
 
-      {/* PREVIEW GRID WITH SAVE BUTTONS */}
-      <div className="grid grid-cols-3 gap-2">
-        {files.map((file, i) => (
-          <div key={i} className="space-y-1">
-            <div className="relative group">
-              <img
-                src={URL.createObjectURL(file)}
-                alt="preview"
-                className="w-full h-20 object-cover rounded-md"
-              />
-              {progress[i] === 100 && outputBlobs[i] && (
-                <button
-                  onClick={() => downloadSingle(i)}
-                  className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
-                >
-                  <Download className="w-5 h-5 text-white" />
-                </button>
-              )}
-            </div>
-            <div className="w-full bg-surface rounded-full h-2">
-              <div
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  errors[i] ? "bg-red-500" : progress[i] === 100 ? "bg-green-500" : "bg-primary"
-                }`}
-                style={{ width: `${errors[i] ? 100 : progress[i] ?? 0}%` }}
-              />
-            </div>
-            <p className="text-xs text-center text-muted-foreground">
-              {errors[i] ? (
-                <span className="text-red-500">Failed</span>
-              ) : progress[i] === 100 && outputSizes[i] ? (
-                <span className="text-green-500">
-                  {formatBytes(file.size)} → {formatBytes(outputSizes[i])}
-                </span>
-              ) : (
-                `${progress[i] ?? 0}%`
-              )}
-            </p>
-          </div>
-        ))}
-      </div>
+      <PreviewGrid
+        files={files}
+        progress={progress}
+        errors={errors}
+        outputSizes={outputSizes}
+        outputBlobs={outputBlobs}
+        selected={selected}
+        onToggle={handleToggle}
+        onSelectAll={handleSelectAll}
+        onDownload={downloadSingle}
+        onDownloadSelected={handleDownloadSelected}
+      />
     </div>
   );
 };
