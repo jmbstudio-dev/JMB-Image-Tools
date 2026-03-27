@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
 import { Lock, Unlock } from "lucide-react";
-import { formatBytes } from "../utils/formatBytes";
+// import { formatBytes } from "../utils/formatBytes";
 import { PreviewGrid } from "./PreviewGrid";
 
 type ResizeMode = "px" | "percent";
