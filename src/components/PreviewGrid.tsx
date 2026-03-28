@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Download, Copy, Check, CheckSquare, Square } from "lucide-react";
 import { formatBytes } from "../utils/formatBytes";
 
@@ -29,22 +29,44 @@ export const PreviewGrid = ({
 }: PreviewGridProps) => {
   const [copied, setCopied] = useState<number | null>(null);
 
+  // --- FIX 1: create object URLs once per file list, revoke on cleanup ---
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const prevFilesRef = useRef<File[]>([]);
+
+  useEffect(() => {
+    // Only regenerate if the file list actually changed
+    if (prevFilesRef.current === files) return;
+    prevFilesRef.current = files;
+
+    // Revoke previous URLs
+    setPreviewUrls((prev) => {
+      prev.forEach((url) => URL.revokeObjectURL(url));
+      return files.map((f) => URL.createObjectURL(f));
+    });
+
+    return () => {
+      setPreviewUrls((prev) => {
+        prev.forEach((url) => URL.revokeObjectURL(url));
+        return [];
+      });
+    };
+  }, [files]);
+
   if (files.length === 0) return null;
 
   const doneCount = outputBlobs.filter(Boolean).length;
-  const allSelected = selected.every(Boolean);
+  // --- FIX 3: "all selectable" = every done blob is checked, not every index ---
+  const selectableCount = outputBlobs.filter(Boolean).length;
   const selectedCount = selected.filter(Boolean).length;
+  const allSelected = selectableCount > 0 && selectedCount === selectableCount;
 
+  // --- FIX 2: clipboard always writes image/png, type var is no longer duplicated ---
   const handleCopy = async (idx: number) => {
     const blob = outputBlobs[idx];
     if (!blob) return;
     try {
-      // Determine a clipboard-compatible type
-      const type = blob.type === "image/png" ? "image/png" : "image/png";
-      let copyBlob = blob;
+      let pngBlob = blob;
 
-      // Navigator clipboard only supports image/png reliably
-      // Convert to PNG via canvas if needed
       if (blob.type !== "image/png") {
         const bmp = await createImageBitmap(blob);
         const canvas = document.createElement("canvas");
@@ -52,13 +74,13 @@ export const PreviewGrid = ({
         canvas.height = bmp.height;
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(bmp, 0, 0);
-        copyBlob = await new Promise<Blob>((res, rej) =>
+        pngBlob = await new Promise<Blob>((res, rej) =>
           canvas.toBlob((b) => (b ? res(b) : rej()), "image/png"),
         );
       }
 
       await navigator.clipboard.write([
-        new ClipboardItem({ [type]: copyBlob }),
+        new ClipboardItem({ "image/png": pngBlob }),
       ]);
 
       setCopied(idx);
@@ -106,7 +128,7 @@ export const PreviewGrid = ({
             <div key={i} className="space-y-1">
               <div className="relative group">
                 <img
-                  src={URL.createObjectURL(file)}
+                  src={previewUrls[i] ?? ""}
                   alt="preview"
                   className={`w-full h-20 object-cover rounded-md transition-opacity ${
                     selected[i] ? "ring-2 ring-primary" : ""
