@@ -9,6 +9,9 @@ A fast, private, client-side image toolkit built with React + Vite. No login, no
 
 ### 🔄 Converter
 - Convert images to **WebP, JPEG, PNG, BMP, AVIF**
+- 🖼️ **SVG support** — convert SVG files to any raster format (WebP, JPEG, PNG, BMP, AVIF)
+- 📄 **SVG → HTML** — embed an SVG inline in a clean, self-contained HTML file
+- 📏 **SVG render size** slider — control output resolution (128px – 4096px, longest side)
 - 🎚️ **Quality control** slider for lossy formats (WebP, JPEG, AVIF)
 - 📊 **File size comparison** — see original vs converted size per image
 - 📦 Batch convert up to **20 files** at once — downloaded as a `.zip`
@@ -54,6 +57,8 @@ This tool is entirely client-side. No data is sent to any server. No analytics o
 - HEIC/HEIF (iPhone photos) are not currently supported as input [will work on this]
 - Compression time varies by file size and device — large files on mobile may take longer
 - Cropper works on one image at a time
+- SVG files that use external resources (fonts, images, filters) may not render correctly when converted to raster
+- **SVG → HTML** output only supports SVG source files
 
 ---
 
@@ -95,7 +100,7 @@ npm run preview
 | TypeScript | Type safety |
 | Vite 7 | Build tool |
 | Tailwind CSS v4 | Styling |
-| Canvas API | Image conversion and resizing |
+| Canvas API | Image conversion, SVG rasterization, and resizing |
 | browser-image-compression | Image compression via Web Workers |
 | JSZip | Bundling output files into `.zip` |
 | file-saver | Triggering browser download |
@@ -106,7 +111,7 @@ npm run preview
 ```
 src/
 ├── components/
-│   ├── ConverterTab.tsx    ← format conversion logic
+│   ├── ConverterTab.tsx    ← format conversion logic (incl. SVG → raster & SVG → HTML)
 │   ├── CompressorTab.tsx   ← compression logic
 │   ├── ResizerTab.tsx      ← resize logic
 │   ├── CropperTab.tsx      ← crop logic
